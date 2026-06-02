@@ -172,7 +172,9 @@ function VocabModule({ addXP, sessionMode, onSessionDone }) {
   async function load() {
     setLoading(true); setCards([]); setIdx(0); setFlipped(false);
     setMode("cards"); setDone(false); setScore({ c: 0, t: 0 });
-    const raw = await askClaude(`Generate 5 vocabulary flashcards for a supply chain professional. Choose a specific topic from their daily work.
+    const topics = ["S&OP planning","demand forecasting","inventory management","supplier negotiation","plant operations","logistics and shipping","KPI reporting","SAP transactions","production scheduling","warehouse management","procurement","sales and operations","capacity planning","lead times","safety stock"];
+    const topic = topics[Math.floor(Math.random() * topics.length)];
+    const raw = await askClaude(`Generate 5 vocabulary flashcards about "${topic}" for a supply chain professional. Use ONLY words specific to this topic — do NOT repeat common words like forecast, inventory, supplier, demand. Pick specific technical or professional vocabulary a native US colleague would use in this context.
 Return ONLY a JSON array — each item must have exactly these fields:
 [{"word":"...","phonetic":"...pronunciation hint easy for Spanish speaker...","definition":"...1 sentence English definition...","spanish":"...Spanish translation...","example":"...realistic work sentence using the word...","tip":"...one native US usage tip...","wrong":["...wrong Spanish 1...","...wrong Spanish 2...","...wrong Spanish 3..."]}]`);
     try {
