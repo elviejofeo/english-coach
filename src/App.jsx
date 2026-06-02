@@ -211,7 +211,7 @@ Return ONLY a JSON array — each item must have exactly these fields:
   }
 
   function nextQ() {
-    if (tIdx + 1 >= tests.length) { setDone(true); if (sessionMode && onSessionDone) onSessionDone(score.c + (answered === tests[tIdx].ans ? 1 : 0)); return; }
+    if (tIdx + 1 >= tests.length) { setDone(true); if (sessionMode && onSessionDone) onSessionDone(score.c + (answered === tests[tIdx].ans ? 1 : 0), { words: cards.map(c => c.word) }); return; }
     setTIdx(i => i + 1); setAnswered(null);
   }
 
@@ -319,7 +319,7 @@ Return ONLY a JSON array — each item must have exactly these fields:
 // ══════════════════════════════════════════════════════════════════════════════
 // LISTENING MODULE
 // ══════════════════════════════════════════════════════════════════════════════
-function ListeningModule({ addXP, sessionMode, onSessionDone }) {
+function ListeningModule({ addXP, sessionMode, onSessionDone, sessionWords = [], sessionPhrases = [] }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -337,7 +337,10 @@ function ListeningModule({ addXP, sessionMode, onSessionDone }) {
     setLoading(true); setData(null); setRevealed(false); setMode("listen");
     setDone(false); setScore({ c: 0, t: 0 }); stopSpeech();
     playRef.current = false; setPlaying(false); setActiveLine(-1);
-    const raw = await askClaude(`Create a 6-line dialogue between two US supply chain professionals. Use natural native American English: contractions, phrasal verbs, idioms, fillers like "alright","so basically","I mean","you know".
+    const wordsHint = sessionWords.length > 0
+      ? `IMPORTANT: Naturally incorporate these vocabulary words into the dialogue: ${sessionWords.join(", ")}. Also reflect the professional context of these phrases if available: ${sessionPhrases.join(", ")}.`
+      : "";
+    const raw = await askClaude(`Create a 6-line dialogue between two US supply chain professionals. Use natural native American English: contractions, phrasal verbs, idioms, fillers like "alright","so basically","I mean","you know". ${wordsHint}
 Return ONLY this JSON object:
 {"title":"...","context":"...one sentence scene...","speakers":["Name (role)","Name (role)"],"lines":[{"speaker":"...","text":"...","note":"...optional short Spanish note only if very tricky..."}],"keyPhrases":[{"phrase":"...","spanish":"..."}],"tests":[{"q":"...comprehension or meaning question in English...","opts":["...correct...","...wrong...","...wrong...","...wrong..."],"ans":0}]}
 Include 4 test questions. ans is always 0 (the first option is always correct — I will shuffle them).`, 1600);
@@ -546,7 +549,7 @@ ans is always 0 — correct answer is always first option (I will shuffle).`);
   }
 
   function nextQ() {
-    if (tIdx + 1 >= tests.length) { setDone(true); if (sessionMode && onSessionDone) onSessionDone(score.c); return; }
+    if (tIdx + 1 >= tests.length) { setDone(true); if (sessionMode && onSessionDone) onSessionDone(score.c, { phrases: phrases.map(p => p.phrase) }); return; }
     setTIdx(i => i + 1); setAnswered(null);
   }
 
@@ -640,15 +643,17 @@ ans is always 0 — correct answer is always first option (I will shuffle).`);
 // SESSION MODE  (~25 min guided session)
 // ══════════════════════════════════════════════════════════════════════════════
 const SESSION_STEPS = [
-  { id: "vocab",     label: "Vocabulary",   icon: "📦", desc: "Learn 5 words + mini test" },
-  { id: "listening", label: "Listening",    icon: "🎧", desc: "Dialogue + context test" },
-  { id: "phrases",   label: "Phrases",      icon: "💬", desc: "6 phrases + usage test" },
+  { id: "vocab",     label: "Vocabulary", icon: "📦", desc: "Learn 5 words + mini test" },
+  { id: "phrases",   label: "Phrases",    icon: "💬", desc: "6 phrases + usage test" },
+  { id: "listening", label: "Listening",  icon: "🎧", desc: "Dialogue using today's words & phrases" },
 ];
 
 function SessionMode({ addXP, onExit }) {
-  const [step, setStep] = useState(0);         // 0=intro, 1=vocab, 2=listening, 3=phrases, 4=done
+  const [step, setStep] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [scores, setScores] = useState([]);
+  const [sessionWords, setSessionWords] = useState([]);
+  const [sessionPhrases, setSessionPhrases] = useState([]);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -656,7 +661,9 @@ function SessionMode({ addXP, onExit }) {
     return () => clearInterval(timerRef.current);
   }, []);
 
-  function onStepDone(sc) {
+  function onStepDone(sc, data) {
+    if (step === 1 && data?.words) setSessionWords(data.words);
+    if (step === 2 && data?.phrases) setSessionPhrases(data.phrases);
     setScores(s => [...s, sc]);
     setStep(s => s + 1);
   }
@@ -722,8 +729,8 @@ function SessionMode({ addXP, onExit }) {
       )}
 
       {step === 1 && <VocabModule addXP={addXP} sessionMode onSessionDone={onStepDone} />}
-      {step === 2 && <ListeningModule addXP={addXP} sessionMode onSessionDone={onStepDone} />}
-      {step === 3 && <PhrasesModule addXP={addXP} sessionMode onSessionDone={onStepDone} />}
+      {step === 2 && <PhrasesModule addXP={addXP} sessionMode onSessionDone={onStepDone} />}
+      {step === 3 && <ListeningModule addXP={addXP} sessionMode onSessionDone={onStepDone} sessionWords={sessionWords} sessionPhrases={sessionPhrases} />}
 
       {step === 4 && (
         <div style={cardStyle(true, { textAlign: "center", padding: 28 })}>
